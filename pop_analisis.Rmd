@@ -1,0 +1,55 @@
+
+---
+title: "Análisis de datos de movilidad de Facebook COVID-19"
+author: Grupo covid19UNGS
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+  
+```{r setup, include=FALSE,echo=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+needed_packages <- c(
+    "tidyverse"
+  , "lubridate"
+  , "sf"
+  , "GADMTools"
+  , "tmap")
+
+lapply(needed_packages, function(x) { if(!require(x,character.only = TRUE)) install.packages(x)} )
+
+theme_set(theme_bw())
+#source("R/functions.R")
+```
+
+# Primer intento
+
+```{r readData}
+fnames <- list.files("Data/AMBA_facebookpop", "^.*04_15.*\\.csv$")
+fnames <- paste0("Data/AMBA_facebookpop/", fnames)
+pop <- lapply(fnames, read_csv)
+pop <- bind_rows(pop)
+points_sf <- st_as_sf(pop, coords = c("lon", "lat"), crs = 4326) %>% filter(country=="AR")
+
+# Cargar info de Limites
+#
+arg <- gadm_sf_loadCountries("ARG",level=2,basefile = "Data/")
+
+lujan <- arg$sf %>% filter(NAME_1=="Buenos Aires") # ,NAME_2=="Luján"  
+lujan
+lujan_pop <- points_sf[lujan,]
+
+amba_region <- st_bbox(lujan_pop) %>% st_as_sfc()
+#tmap_mode("view")
+tmap_mode("plot")
+# VEr
+# https://stackoverflow.com/questions/56903210/how-to-add-a-basemap-to-a-tmap-plot-in-r
+#bmap <- amba_region %>% read_osm()
+
+tm_shape(lujan, bbox=amba_region) + tm_borders() + 
+  tm_shape(lujan_pop) + tm_dots(col= "percent_change") + tm_basemap(server = "OpenStreetMap")
+
+```
+

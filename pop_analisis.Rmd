@@ -48,8 +48,152 @@ tmap_mode("plot")
 # https://stackoverflow.com/questions/56903210/how-to-add-a-basemap-to-a-tmap-plot-in-r
 #bmap <- amba_region %>% read_osm()
 
-tm_shape(lujan, bbox=amba_region) + tm_borders() + 
+map <- tm_shape(lujan, bbox=amba_region) + tm_borders() + 
   tm_shape(lujan_pop) + tm_dots(col= "percent_change") + tm_basemap(server = "OpenStreetMap")
 
-```
+map
 
+```
+```{r Pilar}
+#Notas sobre los datos
+
+#00 corresponde a 21hs - 5hs en Arg (UTC-3)
+#08 a 5hs - 13hs 
+#16 a 13hs - 21hs
+
+#variables --> 
+#zscore : number of standard deviasion from Baseline
+#percent difference: con el baseline (promedio de los 45 dias previos a la fecha de pedido, para cada horario)
+#N_crisis: personas activas --> si hay menos de 10 no los reportan y ponen \N
+#en el percent difference que estiman ellos se ve que usan todos los datos aunque N<10 pero no indican el numero de N_crisis (por eso percent difference esta mas completo que la diferencia de 15 dias) 
+
+#carge los csv que use aca solamente, en OSF cargue todos los datos que faltan --> los de la Pcia de Bs As tienen una resolucion de 2km, los de AMBA de 500m. Lujan esta en el limite.
+
+fnames <- list.files("Data/AMBA_facebookpop")
+fnames <- paste0("Data/AMBA_facebookpop/", fnames)
+pop <- lapply(fnames, read_csv)
+pop <- bind_rows(pop)
+
+#change \N for NAs
+pop <- data.frame(lapply(pop, function(x) {gsub("[\\N]", "", x)}))
+pop[pop==""]<-NA
+
+#generate ID
+pop$ID <- paste0(pop$lat,pop$lon)
+pop2 <- transform(pop,quadID=as.numeric(factor(ID)))
+
+#todo este proceso hay que hacerlo en loop - en vez de generar pop como long, generarla como wide (cada columna de N_crisis tiene que corresponder con la fecha y hora, para poder hacer operaciones entre columnas mas facil)
+
+pop18_noche <- subset(pop2, pop$date_time == "2020-08-18 00:00:00")
+pop18_am <- subset(pop2, pop$date_time == "2020-08-18 08:00:00")
+pop18_pm <- subset(pop2, pop$date_time == "2020-08-18 16:00:00")
+
+pop25_noche <- subset(pop2, pop$date_time == "2020-08-25 00:00:00")
+pop25_am <- subset(pop2, pop$date_time == "2020-08-25 08:00:00")
+pop25_pm <- subset(pop2, pop$date_time == "2020-08-25 16:00:00")
+
+pop01_noche <- subset(pop2, pop$date_time == "2020-09-01 00:00:00")
+pop01_am <- subset(pop2, pop$date_time == "2020-09-01 08:00:00")
+pop01_pm <- subset(pop2, pop$date_time == "2020-09-01 16:00:00")
+
+pop08_noche <- subset(pop2, pop$date_time == "2020-09-08 00:00:00")
+pop08_am <- subset(pop2, pop$date_time == "2020-09-08 08:00:00")
+pop08_pm <- subset(pop2, pop$date_time == "2020-09-08 16:00:00")
+
+#merge 01/09 18/08 noche y hacer diferencia
+map01_noche <- merge(pop01_noche, pop18_noche, by.x = "quadID", by.y = "quadID", all.x=TRUE)
+
+map01_noche$n_crisis.y <- as.numeric(as.character(map01_noche$n_crisis.y))
+map01_noche$n_crisis.x <- as.numeric(as.character(map01_noche$n_crisis.x))
+map01_noche$percent_change.x <- as.numeric(as.character(map01_noche$percent_change.x))
+
+map01_noche$day15_percent <- (map01_noche$n_crisis.x - map01_noche$n_crisis.y)/ map01_noche$n_crisis.y * 100
+
+summary(map01_noche$day15_percent)
+summary(map01_noche$percent_change.x)
+
+map01_noche <- select(map01_noche, quadID, lat.x, lon.x, day15_percent, percent_change.x)
+
+write.csv(map01_noche, "Data/QGIS/map01-09noche.csv", row.names = FALSE, na = "")
+
+#merge 01/09 18/08 tarde y hacer diferencia
+map01_pm <- merge(pop01_pm, pop18_pm, by.x = "quadID", by.y = "quadID", all.x=TRUE)
+
+map01_pm$n_crisis.y <- as.numeric(as.character(map01_pm$n_crisis.y))
+map01_pm$n_crisis.x <- as.numeric(as.character(map01_pm$n_crisis.x))
+map01_pm$percent_change.x <- as.numeric(as.character(map01_pm$percent_change.x))
+
+map01_pm$day15_percent <- (map01_pm$n_crisis.x - map01_pm$n_crisis.y)/ map01_pm$n_crisis.y * 100
+
+summary(map01_pm$day15_percent)
+summary(map01_pm$percent_change.x)
+
+map01_pm <- select(map01_pm, quadID, lat.x, lon.x, day15_percent, percent_change.x)
+
+write.csv(map01_pm, "Data/QGIS/map01-09pm.csv", row.names = FALSE, na = "")
+
+#merge 01/09 18/08 mañana y hacer diferencia
+map01_am <- merge(pop01_am, pop18_am, by.x = "quadID", by.y = "quadID", all.x=TRUE)
+
+map01_am$n_crisis.y <- as.numeric(as.character(map01_am$n_crisis.y))
+map01_am$n_crisis.x <- as.numeric(as.character(map01_am$n_crisis.x))
+map01_am$percent_change.x <- as.numeric(as.character(map01_am$percent_change.x))
+
+map01_am$day15_percent <- (map01_am$n_crisis.x - map01_am$n_crisis.y)/ map01_am$n_crisis.y * 100
+
+summary(map01_am$day15_percent)
+summary(map01_am$percent_change.x)
+
+map01_am <- select(map01_am, quadID, lat.x, lon.x, day15_percent, percent_change.x)
+
+write.csv(map01_am, "Data/QGIS/map01-09am.csv", row.names = FALSE, na = "")
+
+#merge 08/09 25/08 noche y hacer diferencia
+map08_noche <- merge(pop08_noche, pop25_noche, by.x = "quadID", by.y = "quadID", all.x=TRUE)
+
+map08_noche$n_crisis.y <- as.numeric(as.character(map08_noche$n_crisis.y))
+map08_noche$n_crisis.x <- as.numeric(as.character(map08_noche$n_crisis.x))
+map08_noche$percent_change.x <- as.numeric(as.character(map08_noche$percent_change.x))
+
+map08_noche$day15_percent <- (map08_noche$n_crisis.x - map08_noche$n_crisis.y)/ map08_noche$n_crisis.y * 100
+
+summary(map08_noche$day15_percent)
+summary(map08_noche$percent_change.x)
+
+map08_noche <- select(map08_noche, quadID, lat.x, lon.x, day15_percent, percent_change.x)
+
+write.csv(map08_noche, "Data/QGIS/map08-09noche.csv", row.names = FALSE, na = "")
+
+#merge 08/09 25/08 tarde y hacer diferencia
+map08_pm <- merge(pop01_pm, pop25_pm, by.x = "quadID", by.y = "quadID", all.x=TRUE)
+
+map08_pm$n_crisis.y <- as.numeric(as.character(map08_pm$n_crisis.y))
+map08_pm$n_crisis.x <- as.numeric(as.character(map08_pm$n_crisis.x))
+map08_pm$percent_change.x <- as.numeric(as.character(map08_pm$percent_change.x))
+
+map08_pm$day15_percent <- (map08_pm$n_crisis.x - map08_pm$n_crisis.y)/ map08_pm$n_crisis.y * 100
+
+summary(map08_pm$day15_percent)
+summary(map08_pm$percent_change.x)
+
+map08_pm <- select(map08_pm, quadID, lat.x, lon.x, day15_percent, percent_change.x)
+
+write.csv(map08_pm, "Data/QGIS/map08-09pm.csv", row.names = FALSE, na = "")
+
+#merge 01/09 18/08 mañana y hacer diferencia
+map08_am <- merge(pop01_am, pop18_am, by.x = "quadID", by.y = "quadID", all.x=TRUE)
+
+map08_am$n_crisis.y <- as.numeric(as.character(map08_am$n_crisis.y))
+map08_am$n_crisis.x <- as.numeric(as.character(map08_am$n_crisis.x))
+map08_am$percent_change.x <- as.numeric(as.character(map08_am$percent_change.x))
+
+map08_am$day15_percent <- (map08_am$n_crisis.x - map08_am$n_crisis.y)/ map08_am$n_crisis.y * 100
+
+summary(map08_am$day15_percent)
+summary(map08_am$percent_change.x)
+
+map08_am <- select(map08_am, quadID, lat.x, lon.x, n_crisis.x, day15_percent, percent_change.x)
+
+write.csv(map08_am, "Data/QGIS/map08-09am.csv", row.names = FALSE, na = "")
+#continue en QGIS: rasterice los puntos de percent_difference y la variable de dif de 15 dias a partir del CSV
+```

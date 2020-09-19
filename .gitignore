@@ -42,3 +42,4 @@ index_files/
 # Zip/csv files
 *.zip
 *.csv
+.Rproj.user
